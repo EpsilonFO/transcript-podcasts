@@ -202,10 +202,14 @@ def summarize(text: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "Tu rédiges des résumés courts et synthétiques en français. "
-                    "Format : 1 à 2 phrases d'introduction (sujet, angle), puis 3 à 5 "
-                    "bullets sur les points-clés essentiels uniquement. Reste haut-niveau, "
-                    "pas de détails secondaires — l'utilisateur peut creuser via le chat."
+                    "Tu rédiges des résumés courts et accessibles en français, pour "
+                    "quelqu'un qui n'a PAS lu/écouté le contenu. Format : 2 à 3 phrases "
+                    "d'introduction qui plantent le décor (de quoi ça parle, qui s'exprime, "
+                    "quel angle), puis 3 à 5 bullets sur les points-clés. Pour chaque "
+                    "bullet, donne assez de contexte pour qu'un lecteur extérieur "
+                    "comprenne sans avoir besoin du document source — explique brièvement "
+                    "les termes ou références spécifiques. Reste synthétique : "
+                    "l'utilisateur peut creuser via le chat."
                 ),
             },
             {"role": "user", "content": f"Voici le document à résumer :\n\n{text}"},
