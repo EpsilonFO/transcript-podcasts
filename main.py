@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 import yt_dlp
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from mistralai.client import Mistral
@@ -30,9 +30,33 @@ OCR_MODEL = "mistral-ocr-latest"
 # its bot-check ("Sign in to confirm you're not a bot").
 YTDLP_COOKIES_BROWSER = os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "").strip().lower()
 
-BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "").strip()
-BASIC_AUTH_PASSWORD = os.environ.get("BASIC_AUTH_PASSWORD", "")
-_basic_auth_enabled = bool(BASIC_AUTH_USER and BASIC_AUTH_PASSWORD)
+def _parse_users() -> dict[str, str]:
+    """Parse `BASIC_AUTH_USERS` (format: user1:pass1,user2:pass2,...) plus
+    a single-user fallback via `BASIC_AUTH_USER` + `BASIC_AUTH_PASSWORD`.
+
+    Returns a dict {username: password}. Empty when auth is disabled.
+    """
+    users: dict[str, str] = {}
+    raw = os.environ.get("BASIC_AUTH_USERS", "").strip()
+    if raw:
+        for entry in raw.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            user, _, password = entry.partition(":")
+            user = user.strip()
+            if user and password:
+                users[user] = password
+    if not users:
+        single_user = os.environ.get("BASIC_AUTH_USER", "").strip()
+        single_pass = os.environ.get("BASIC_AUTH_PASSWORD", "")
+        if single_user and single_pass:
+            users[single_user] = single_pass
+    return users
+
+
+USERS = _parse_users()
+ANON_USER = "_anon_"
 
 # If the document is short enough we include it whole in chat context instead
 # of just the summary. Ministral 8B has a 32k context window; keeping a wide
@@ -52,17 +76,19 @@ app = FastAPI(title="Transcript Podcasts")
 
 @app.middleware("http")
 async def basic_auth_middleware(request: Request, call_next):
-    if not _basic_auth_enabled:
+    if not USERS:
+        # No auth configured: still tag activity to a sentinel user so the
+        # owner-scoped data model keeps working in local dev.
+        request.state.user = ANON_USER
         return await call_next(request)
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Basic "):
         try:
             decoded = base64.b64decode(auth[6:]).decode("utf-8")
             user, _, password = decoded.partition(":")
-            if (
-                secrets.compare_digest(user, BASIC_AUTH_USER)
-                and secrets.compare_digest(password, BASIC_AUTH_PASSWORD)
-            ):
+            stored = USERS.get(user)
+            if stored is not None and secrets.compare_digest(password, stored):
+                request.state.user = user
                 return await call_next(request)
         except (ValueError, UnicodeDecodeError):
             pass
@@ -71,6 +97,10 @@ async def basic_auth_middleware(request: Request, call_next):
         headers={"WWW-Authenticate": 'Basic realm="Transcript Podcasts"'},
         content="Unauthorized",
     )
+
+
+def current_user(request: Request) -> str:
+    return getattr(request.state, "user", ANON_USER)
 
 
 def _load_documents() -> dict[str, dict]:
@@ -252,7 +282,7 @@ def download_audio_from_url(url: str) -> tuple[str, bytes, str]:
     return os.path.basename(path), data, title
 
 
-def store_document(text: str, summary: str, title: str, source_kind: str) -> str:
+def store_document(text: str, summary: str, title: str, source_kind: str, owner: str) -> str:
     document_id = uuid.uuid4().hex
     documents[document_id] = {
         "text": text,
@@ -261,13 +291,24 @@ def store_document(text: str, summary: str, title: str, source_kind: str) -> str
         "source_kind": source_kind,
         "created_at": time.time(),
         "messages": [],
+        "owner": owner,
     }
     _save_documents()
     return document_id
 
 
+def get_owned_doc(document_id: str, user: str) -> dict:
+    doc = documents.get(document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document inconnu")
+    if doc.get("owner") != user:
+        # Présenter comme 404 plutôt que 403 pour ne pas révéler l'existence.
+        raise HTTPException(status_code=404, detail="Document inconnu")
+    return doc
+
+
 @app.post("/api/process", response_model=ProcessResponse)
-async def process(file: UploadFile = File(...)):
+async def process(file: UploadFile = File(...), user: str = Depends(current_user)):
     raw = await file.read()
     if not raw:
         raise HTTPException(status_code=400, detail="Fichier vide")
@@ -299,7 +340,7 @@ async def process(file: UploadFile = File(...)):
         raise HTTPException(status_code=502, detail=f"Erreur API Mistral : {e}") from e
 
     title = derive_title(file.filename)
-    document_id = store_document(text, summary, title, source_kind)
+    document_id = store_document(text, summary, title, source_kind, user)
 
     return ProcessResponse(
         document_id=document_id,
@@ -311,7 +352,7 @@ async def process(file: UploadFile = File(...)):
 
 
 @app.post("/api/process-url", response_model=ProcessResponse)
-def process_url(request: UrlRequest):
+def process_url(request: UrlRequest, user: str = Depends(current_user)):
     url = request.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL vide")
@@ -326,7 +367,7 @@ def process_url(request: UrlRequest):
     except SDKError as e:
         raise HTTPException(status_code=502, detail=f"Erreur API Mistral : {e}") from e
 
-    document_id = store_document(text, summary, title, "audio")
+    document_id = store_document(text, summary, title, "audio", user)
     return ProcessResponse(
         document_id=document_id,
         summary=summary,
@@ -337,10 +378,8 @@ def process_url(request: UrlRequest):
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    doc = documents.get(request.document_id)
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document inconnu")
+async def chat(request: ChatRequest, user: str = Depends(current_user)):
+    doc = get_owned_doc(request.document_id, user)
     if not request.messages:
         raise HTTPException(status_code=400, detail="Aucun message")
 
@@ -365,25 +404,35 @@ async def chat(request: ChatRequest):
 
 
 @app.get("/api/documents", response_model=list[ConversationSummary])
-def list_documents():
-    items = [
-        ConversationSummary(
-            document_id=doc_id,
-            title=doc.get("title") or "Sans titre",
-            source_kind=doc.get("source_kind", "text"),
-            created_at=doc.get("created_at", 0.0),
+def list_documents(q: str | None = None, user: str = Depends(current_user)):
+    needle = (q or "").strip().lower()
+    items: list[ConversationSummary] = []
+    for doc_id, doc in documents.items():
+        if doc.get("owner") != user:
+            continue
+        if needle:
+            haystack = " ".join([
+                doc.get("title", ""),
+                doc.get("summary", ""),
+                doc.get("text", ""),
+            ]).lower()
+            if needle not in haystack:
+                continue
+        items.append(
+            ConversationSummary(
+                document_id=doc_id,
+                title=doc.get("title") or "Sans titre",
+                source_kind=doc.get("source_kind", "text"),
+                created_at=doc.get("created_at", 0.0),
+            )
         )
-        for doc_id, doc in documents.items()
-    ]
     items.sort(key=lambda c: c.created_at, reverse=True)
     return items
 
 
 @app.get("/api/documents/{document_id}", response_model=ConversationDetail)
-def get_document(document_id: str):
-    doc = documents.get(document_id)
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document inconnu")
+def get_document(document_id: str, user: str = Depends(current_user)):
+    doc = get_owned_doc(document_id, user)
     return ConversationDetail(
         document_id=document_id,
         title=doc.get("title") or "Sans titre",
@@ -396,9 +445,9 @@ def get_document(document_id: str):
 
 
 @app.delete("/api/documents/{document_id}")
-def delete_document(document_id: str):
-    if documents.pop(document_id, None) is None:
-        raise HTTPException(status_code=404, detail="Document inconnu")
+def delete_document(document_id: str, user: str = Depends(current_user)):
+    get_owned_doc(document_id, user)  # raises 404 if not owner
+    documents.pop(document_id, None)
     _save_documents()
     return {"ok": True}
 

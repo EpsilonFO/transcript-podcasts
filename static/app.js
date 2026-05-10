@@ -16,6 +16,7 @@ const docMetaEl = document.getElementById("doc-meta");
 const deleteBtn = document.getElementById("delete-btn");
 const newBtn = document.getElementById("new-btn");
 const conversationsEl = document.getElementById("conversations");
+const searchInput = document.getElementById("search-input");
 
 const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
@@ -78,14 +79,16 @@ function highlightActive() {
 
 async function refreshConversations() {
   try {
-    const res = await fetch("/api/documents");
+    const q = searchInput.value.trim();
+    const url = q ? `/api/documents?q=${encodeURIComponent(q)}` : "/api/documents";
+    const res = await fetch(url);
     if (!res.ok) return;
     const items = await res.json();
     conversationsEl.innerHTML = "";
     if (items.length === 0) {
       const li = document.createElement("li");
       li.className = "conv-empty";
-      li.textContent = "Aucune conversation";
+      li.textContent = q ? "Aucun résultat" : "Aucune conversation";
       conversationsEl.appendChild(li);
       return;
     }
@@ -102,6 +105,12 @@ async function refreshConversations() {
     /* ignore */
   }
 }
+
+let searchDebounce = null;
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(refreshConversations, 200);
+});
 
 async function loadConversation(documentId) {
   try {
