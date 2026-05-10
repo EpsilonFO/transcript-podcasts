@@ -421,3 +421,80 @@ button.ghost.danger:hover:not(:disabled) {
   }
   .container { padding: 24px 16px 64px; }
 }
+
+/* ── Login page ────────────────────────────────────── */
+.login-body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 380px;
+}
+
+.login-card h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+.login-card .subtitle {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.field span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.field input {
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14.5px;
+}
+.field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.login-card .error {
+  margin: 12px 0 0;
+  color: var(--error);
+  font-size: 13.5px;
+  min-height: 18px;
+}
+
+/* ── Footer of sidebar (logout) ───────────────────── */
+.sidebar-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-footer form {
+  margin: 0;
+}
+.sidebar-footer button {
+  margin: 0;
+  width: 100%;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sidebar-footer button:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}

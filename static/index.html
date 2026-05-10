@@ -17,6 +17,11 @@
       </div>
       <input id="search-input" class="search-input" type="search" placeholder="Rechercher…" autocomplete="off" />
       <ul id="conversations" class="conversations"></ul>
+      <div class="sidebar-footer">
+        <form action="/api/logout" method="POST">
+          <button type="submit">Déconnexion</button>
+        </form>
+      </div>
     </aside>
 
     <main class="container">

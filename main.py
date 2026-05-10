@@ -1,4 +1,3 @@
-import base64
 import json
 import os
 import secrets
@@ -9,13 +8,14 @@ from pathlib import Path
 from typing import Literal
 
 import yt_dlp
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from mistralai.client import Mistral
 from mistralai.client.errors.sdkerror import SDKError
 from mistralai.client.models.file import File as MistralFile
 from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
 
 API_KEY = os.environ.get("MISTRAL_API_KEY")
 if not API_KEY:
@@ -58,6 +58,14 @@ def _parse_users() -> dict[str, str]:
 USERS = _parse_users()
 ANON_USER = "_anon_"
 
+SESSION_SECRET = os.environ.get("SESSION_SECRET", "").strip()
+SESSION_MAX_AGE_DAYS = int(os.environ.get("SESSION_MAX_AGE_DAYS", "7"))
+if USERS and not SESSION_SECRET:
+    raise RuntimeError(
+        "SESSION_SECRET must be set when BASIC_AUTH_USERS is configured. "
+        "Generate one with: openssl rand -hex 32"
+    )
+
 # If the document is short enough we include it whole in chat context instead
 # of just the summary. Ministral 8B has a 32k context window; keeping a wide
 # margin avoids truncation issues when chat history grows.
@@ -73,29 +81,43 @@ DATA_FILE = DATA_DIR / "conversations.json"
 client = Mistral(api_key=API_KEY)
 app = FastAPI(title="Transcript Podcasts")
 
+# Paths that don't require auth (login UI itself + login form submission).
+# Static assets are also exempted via prefix check below.
+PUBLIC_PATHS = {"/login", "/api/login"}
 
+
+# Defined first so SessionMiddleware (added below) wraps it as the outer
+# middleware: SessionMiddleware runs first → request.session is ready by the
+# time auth_middleware reads it.
 @app.middleware("http")
-async def basic_auth_middleware(request: Request, call_next):
+async def auth_middleware(request: Request, call_next):
     if not USERS:
-        # No auth configured: still tag activity to a sentinel user so the
-        # owner-scoped data model keeps working in local dev.
         request.state.user = ANON_USER
         return await call_next(request)
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Basic "):
-        try:
-            decoded = base64.b64decode(auth[6:]).decode("utf-8")
-            user, _, password = decoded.partition(":")
-            stored = USERS.get(user)
-            if stored is not None and secrets.compare_digest(password, stored):
-                request.state.user = user
-                return await call_next(request)
-        except (ValueError, UnicodeDecodeError):
-            pass
-    return Response(
-        status_code=401,
-        headers={"WWW-Authenticate": 'Basic realm="Transcript Podcasts"'},
-        content="Unauthorized",
+
+    path = request.url.path
+    user = request.session.get("user")
+    if user and user in USERS:
+        request.state.user = user
+        return await call_next(request)
+
+    if path in PUBLIC_PATHS or path.startswith("/static/"):
+        return await call_next(request)
+
+    if path.startswith("/api/"):
+        return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
+    return RedirectResponse(url="/login", status_code=302)
+
+
+if USERS:
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=SESSION_SECRET,
+        max_age=SESSION_MAX_AGE_DAYS * 86400,
+        same_site="lax",
+        # nginx handles HTTPS/redirect in prod; keep this False so local dev
+        # over plain HTTP still works.
+        https_only=False,
     )
 
 
@@ -457,6 +479,36 @@ def delete_document(document_id: str, user: str = Depends(current_user)):
 
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/login")
+def login_page(request: Request):
+    # Already logged in → bounce to /
+    if USERS and request.session.get("user") in USERS:
+        return RedirectResponse(url="/", status_code=302)
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.post("/api/login")
+def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    if not USERS:
+        return RedirectResponse(url="/", status_code=303)
+    stored = USERS.get(username)
+    ok = stored is not None and secrets.compare_digest(password, stored)
+    if not ok:
+        return RedirectResponse(url="/login?error=1", status_code=303)
+    request.session["user"] = username
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/api/logout")
+def logout(request: Request):
+    request.session.pop("user", None)
+    return RedirectResponse(url="/login", status_code=303)
 
 
 @app.get("/")

@@ -36,6 +36,17 @@ function renderMarkdown(text) {
   return DOMPurify.sanitize(marked.parse(text || ""));
 }
 
+// Wrap fetch so a 401 (expired session) sends the user back to /login.
+const _origFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const res = await _origFetch(...args);
+  if (res.status === 401) {
+    window.location.assign("/login");
+    throw new Error("Non authentifié");
+  }
+  return res;
+};
+
 function setStatus(msg, isError = false) {
   uploadStatus.textContent = msg;
   uploadStatus.classList.toggle("error", isError);
