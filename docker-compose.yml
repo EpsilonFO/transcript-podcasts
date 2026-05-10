@@ -1,0 +1,20 @@
+services:
+  transcript-backend:
+    build: .
+    container_name: transcript-backend
+    env_file:
+      - .env
+    volumes:
+      - transcript_data:/app/data
+    networks:
+      - patrialta_default
+    restart: unless-stopped
+
+# Join the existing patrialta-managed network so patrialta-nginx can
+# reach this container by name. No change needed to patrialta's compose.
+networks:
+  patrialta_default:
+    external: true
+
+volumes:
+  transcript_data:

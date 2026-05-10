@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Résumeur & Chat de documents</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked@14.1.3/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Conversations</h2>
+        <button id="new-btn" class="ghost" title="Nouveau document">＋</button>
+      </div>
+      <ul id="conversations" class="conversations"></ul>
+    </aside>
+
+    <main class="container">
+      <header>
+        <h1>Résumer & discuter</h1>
+        <p class="subtitle">Téléverse un texte (.txt, .md, .pdf) ou un fichier audio. Je transcris, je résume, puis on en discute.</p>
+      </header>
+
+      <section id="upload-view" class="card">
+        <form id="upload-form">
+          <label for="file-input" class="dropzone" id="dropzone">
+            <span class="dropzone-icon">⬆</span>
+            <span class="dropzone-label">Cliquer ou déposer un fichier ici</span>
+            <span class="dropzone-hint">Texte, PDF, ou audio (mp3, wav, m4a…)</span>
+            <span class="dropzone-filename" id="filename"></span>
+            <input id="file-input" type="file" accept=".txt,.md,.pdf,.mp3,.wav,.m4a,.flac,.ogg,.webm,.mp4,.mpeg,.mpga,audio/*" hidden />
+          </label>
+          <button id="submit-btn" type="submit" disabled>Résumer</button>
+        </form>
+
+        <div class="separator"><span>ou</span></div>
+
+        <form id="url-form">
+          <input id="url-input" type="url" placeholder="Coller un lien YouTube, podcast (RSS, Apple, SoundCloud…)" />
+          <button id="url-submit-btn" type="submit" disabled>Récupérer & résumer</button>
+        </form>
+        <p class="hint">Deezer n'est pas supporté (DRM). Pour un podcast Deezer, retrouve-le sur Apple Podcasts, SoundCloud, le site officiel du show ou son flux RSS.</p>
+
+        <div id="upload-status" class="status" aria-live="polite"></div>
+      </section>
+
+      <section id="result-view" class="hidden">
+        <div class="card">
+          <div class="result-header">
+            <h2 id="doc-title">Résumé</h2>
+            <button id="delete-btn" class="ghost danger" title="Supprimer cette conversation">Supprimer</button>
+          </div>
+          <div id="summary-content" class="markdown summary"></div>
+          <p class="meta" id="doc-meta"></p>
+        </div>
+
+        <div class="card chat-card">
+          <h2>Discuter du document</h2>
+          <div id="chat-log" class="chat-log"></div>
+          <form id="chat-form" class="chat-form">
+            <input id="chat-input" type="text" placeholder="Pose une question sur le document…" autocomplete="off" required />
+            <button type="submit">Envoyer</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
