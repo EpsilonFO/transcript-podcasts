@@ -109,7 +109,7 @@ async function refreshConversations() {
       li.innerHTML = `
         <span class="conv-icon">${SOURCE_ICONS[item.source_kind] || "📄"}</span>
         <span class="conv-title"></span>
-        <button class="conv-delete" title="Supprimer" aria-label="Supprimer cette conversation">×</button>
+        <button class="conv-delete" title="Supprimer" aria-label="Supprimer cette conversation">🗑</button>
       `;
       li.querySelector(".conv-title").textContent = item.title;
       li.addEventListener("click", (e) => {

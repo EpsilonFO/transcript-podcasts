@@ -10,7 +10,7 @@
   --user-bubble: #2b3140;
   --assistant-bubble: #1e2230;
   --error: #ff6b6b;
-  --sidebar-w: 260px;
+  --sidebar-w: 320px;
 }
 
 * { box-sizing: border-box; }
@@ -106,33 +106,39 @@ html, body {
   opacity: 0.75;
   flex-shrink: 0;
 }
-.conv-delete {
+.conversations li button.conv-delete {
   margin: 0;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
   padding: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--muted);
   border: none;
-  font-size: 18px;
+  font-size: 15px;
+  font-weight: normal;
   line-height: 1;
   flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.1s, background 0.1s, color 0.1s;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.conversations li:hover .conv-delete,
-.conversations li.active .conv-delete {
-  opacity: 1;
+.conversations li:hover button.conv-delete,
+.conversations li.active button.conv-delete {
+  opacity: 0.6;
 }
-.conv-delete:hover {
+.conversations li button.conv-delete:hover {
   background: rgba(255, 107, 107, 0.15);
   color: var(--error);
+  opacity: 1;
 }
 @media (hover: none) {
-  /* tactile : la croix reste visible en permanence */
-  .conv-delete { opacity: 0.6; }
+  /* tactile : l'icône reste visible en permanence */
+  .conversations li button.conv-delete { opacity: 0.55; }
 }
 .conv-title {
   flex: 1;
