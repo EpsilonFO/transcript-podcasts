@@ -106,9 +106,28 @@ async function refreshConversations() {
     for (const item of items) {
       const li = document.createElement("li");
       li.dataset.id = item.document_id;
-      li.innerHTML = `<span class="conv-icon">${SOURCE_ICONS[item.source_kind] || "📄"}</span><span class="conv-title"></span>`;
+      li.innerHTML = `
+        <span class="conv-icon">${SOURCE_ICONS[item.source_kind] || "📄"}</span>
+        <span class="conv-title"></span>
+        <button class="conv-delete" title="Supprimer" aria-label="Supprimer cette conversation">×</button>
+      `;
       li.querySelector(".conv-title").textContent = item.title;
-      li.addEventListener("click", () => loadConversation(item.document_id));
+      li.addEventListener("click", (e) => {
+        if (e.target.closest(".conv-delete")) return;
+        loadConversation(item.document_id);
+      });
+      li.querySelector(".conv-delete").addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Supprimer "${item.title}" ?`)) return;
+        try {
+          const res = await fetch(`/api/documents/${item.document_id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error("Suppression échouée");
+          if (state.documentId === item.document_id) showUploadView();
+          refreshConversations();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
       conversationsEl.appendChild(li);
     }
     highlightActive();

@@ -106,6 +106,34 @@ html, body {
   opacity: 0.75;
   flex-shrink: 0;
 }
+.conv-delete {
+  margin: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  cursor: pointer;
+}
+.conversations li:hover .conv-delete,
+.conversations li.active .conv-delete {
+  opacity: 1;
+}
+.conv-delete:hover {
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--error);
+}
+@media (hover: none) {
+  /* tactile : la croix reste visible en permanence */
+  .conv-delete { opacity: 0.6; }
+}
 .conv-title {
   flex: 1;
   white-space: nowrap;
