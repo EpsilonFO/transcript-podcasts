@@ -106,39 +106,31 @@ html, body {
   opacity: 0.75;
   flex-shrink: 0;
 }
-.conversations li button.conv-delete {
-  margin: 0;
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  padding: 0;
+.conv-delete {
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  border: none;
-  font-size: 15px;
-  font-weight: normal;
+  font-size: 13px;
   line-height: 1;
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.1s, background 0.1s, color 0.1s;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
+  transition: opacity 0.1s, background 0.1s;
 }
-.conversations li:hover button.conv-delete,
-.conversations li.active button.conv-delete {
+.conversations li:hover .conv-delete,
+.conversations li.active .conv-delete {
   opacity: 0.6;
 }
-.conversations li button.conv-delete:hover {
+.conv-delete:hover {
   background: rgba(255, 107, 107, 0.15);
-  color: var(--error);
   opacity: 1;
 }
 @media (hover: none) {
-  /* tactile : l'icône reste visible en permanence */
-  .conversations li button.conv-delete { opacity: 0.55; }
+  .conv-delete { opacity: 0.55; }
 }
 .conv-title {
   flex: 1;
