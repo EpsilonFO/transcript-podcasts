@@ -6,15 +6,9 @@ services:
       - .env
     volumes:
       - transcript_data:/app/data
-    networks:
-      - patrialta_default
+    ports:
+      - "127.0.0.1:8001:8000"
     restart: unless-stopped
-
-# Join the existing patrialta-managed network so patrialta-nginx can
-# reach this container by name. No change needed to patrialta's compose.
-networks:
-  patrialta_default:
-    external: true
 
 volumes:
   transcript_data:
